@@ -2262,3 +2262,890 @@ Una vez tengas esto funcionando, puedes ampliar:
 
 ¿Quieres que te genere **el diagrama ERD como imagen SVG o PNG** (bonito y con colores tipo draw.io o dbdiagram.io)?  
 Puedo generarlo automáticamente para tu documentación del proyecto.
+
+
+
+```prompt
+Pasos para completar esto
+Una vez tengas esto funcionando, puedes ampliar:
+
+Transfers (modelo StockTransfer) para mover productos entre ubicaciones.
+
+Stock Movements (entradas/salidas).
+
+Reports (movimiento histórico, costos promedio, rotación de stock).
+```
+
+Perfecto, Pazzo 😎  
+ya tienes la base sólida con `Warehouse`, `Store`, `Product`, `ProductItem` y sus broadcasts Turbo.  
+Aquí te dejo los **pasos exactos** para completar todo el sistema de almacén y expandirlo con **Transfers, Movements y Reports**, ordenado por fases.
+
+---
+
+## 🧩 FASE 1 — Base lista (lo que ya tienes)
+
+✅ Modelos y relaciones:
+
+- `Warehouse`, `Store`, `Product`, `ProductItem`  
+    ✅ Turbo Streams y Stimulus:
+    
+- Selector dinámico entre Warehouse/Store
+    
+- Creación/edición/eliminación de ubicaciones en vivo  
+    ✅ ERD listo (`inventory-erd.excalidraw`)
+    
+
+---
+
+## 🚛 FASE 2 — Stock Transfers (movimientos entre ubicaciones)
+
+**Objetivo:** mover productos entre `Warehouse` y `Store` (o entre dos `Stores`).
+
+### 🔹 Modelos
+
+```ruby
+# app/models/stock_transfer.rb
+class StockTransfer < ApplicationRecord
+  belongs_to :source, polymorphic: true  # Warehouse o Store
+  belongs_to :destination, polymorphic: true
+  has_many :stock_transfer_items, dependent: :destroy
+  accepts_nested_attributes_for :stock_transfer_items, allow_destroy: true
+
+  validates :source, :destination, presence: true
+  validate :different_locations
+
+  after_commit :process_transfer, on: :create
+
+  private
+
+  def different_locations
+    errors.add(:destination, "no puede ser igual al origen") if source == destination
+  end
+
+  def process_transfer
+    stock_transfer_items.each do |item|
+      ProductItem.transaction do
+        source_item = ProductItem.find_by(product: item.product, location: source)
+        dest_item = ProductItem.find_or_create_by(product: item.product, location: destination)
+
+        source_item.decrement!(:quantity, item.quantity)
+        dest_item.increment!(:quantity, item.quantity)
+      end
+    end
+  end
+end
+```
+
+```ruby
+# app/models/stock_transfer_item.rb
+class StockTransferItem < ApplicationRecord
+  belongs_to :stock_transfer
+  belongs_to :product
+
+  validates :quantity, numericality: { greater_than: 0 }
+end
+```
+
+### 🔹 Vistas y controladores
+
+- CRUD de `StockTransfer` con Turbo Frames.
+    
+- Form con dos selects (`source` y `destination`), dinámicos según tipo de ubicación.
+    
+- Nested form para los ítems transferidos (usando Stimulus o Cocoon).
+    
+
+---
+
+## 📦 FASE 3 — Stock Movements (entradas y salidas)
+
+**Objetivo:** registrar ajustes de inventario manuales (por ejemplo, entrada de proveedor o merma).
+
+### 🔹 Modelos
+
+```ruby
+# app/models/stock_movement.rb
+class StockMovement < ApplicationRecord
+  belongs_to :location, polymorphic: true
+  belongs_to :product
+
+  enum movement_type: { in: 0, out: 1 }
+
+  validates :quantity, numericality: { greater_than: 0 }
+
+  after_commit :apply_movement, on: :create
+
+  private
+
+  def apply_movement
+    item = ProductItem.find_or_create_by(product: product, location: location)
+    if in?
+      item.increment!(:quantity, quantity)
+    else
+      item.decrement!(:quantity, quantity)
+    end
+  end
+end
+```
+
+### 🔹 Controlador y vistas
+
+- Form simple con `product`, `movement_type`, `quantity`, `location`.
+    
+- Turbo Stream de actualización en vivo de la cantidad del `ProductItem`.
+    
+
+---
+
+## 📊 FASE 4 — Reports (histórico y métricas)
+
+**Objetivo:** analizar el inventario a lo largo del tiempo.
+
+### 🔹 Modelos / consultas
+
+Podés usar scopes o modelos “virtuales” (como `StockReport`):
+
+```ruby
+class StockReport
+  def self.movement_history(product)
+    StockMovement.where(product:).order(created_at: :desc)
+  end
+
+  def self.average_cost(product)
+    movements = StockMovement.where(product:, movement_type: :in)
+    total_cost = movements.sum("quantity * cost_price")
+    total_qty = movements.sum(:quantity)
+    total_qty.zero? ? 0 : (total_cost / total_qty)
+  end
+
+  def self.rotation_rate(product)
+    out = StockMovement.where(product:, movement_type: :out).sum(:quantity)
+    avg_stock = ProductItem.where(product:).average(:quantity) || 0
+    avg_stock.zero? ? 0 : (out / avg_stock)
+  end
+end
+```
+
+### 🔹 Interfaz
+
+- Página `/reports` con gráficos usando Chartkick o Recharts (ya compatibles con Turbo).
+    
+- Filtros por fechas, ubicación, categoría de producto.
+    
+
+---
+
+## 🧠 FASE 5 — Auditoría y mejora
+
+- Agregar `PaperTrail` o `Audited` para historial de cambios.
+    
+- Implementar `acts_as_tenant` si deseas multiempresa.
+    
+- Añadir WebSocket broadcast de movimientos (dashboard en vivo).
+    
+
+---
+
+¿Quieres que te genere ahora el **.excalidraw actualizado** con estos tres módulos nuevos (`StockTransfer`, `StockMovement`, `StockReport`) y sus relaciones visuales (extendiendo el que ya hicimos)?  
+Puedo dejártelo listo para reemplazar en tu Obsidian.
+
+Perfecto, Pazzo 😎 — vamos full-stack entonces.  
+Te voy a dejar **todas las vistas Turbo-ready (Bootstrap 5)** para los nuevos módulos:
+
+- `StockTransfers`
+    
+- `StockMovements`
+    
+- `Reports` (solo lectura)
+    
+
+Cada una usa **Turbo Frames** y **Turbo Streams**, y sigue el estilo de Bootstrap 5 con cards, modales y botones claros.  
+Así puedes copiarlas directo a tu `app/views/` y tener el flujo completo funcionando.
+
+---
+
+# 🧱 Estructura general
+
+```
+app/views/
+├── stock_transfers/
+│   ├── index.html.erb
+│   ├── _form.html.erb
+│   ├── _item_fields.html.erb
+│   ├── show.html.erb
+│   ├── new.html.erb
+│   └── edit.html.erb
+├── stock_movements/
+│   ├── index.html.erb
+│   ├── _form.html.erb
+│   ├── show.html.erb
+│   ├── new.html.erb
+│   └── edit.html.erb
+└── reports/
+    └── index.html.erb
+```
+
+---
+
+## 🔹 `app/views/stock_transfers/index.html.erb`
+
+```erb
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Transferencias de Stock</h2>
+  <%= link_to "Nueva transferencia", new_stock_transfer_path, data: { turbo_frame: "modal" }, class: "btn btn-primary" %>
+</div>
+
+<table class="table table-hover">
+  <thead>
+    <tr>
+      <th>Origen</th>
+      <th>Destino</th>
+      <th>Fecha</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="stock_transfers">
+    <%= render @stock_transfers %>
+  </tbody>
+</table>
+
+<%= turbo_frame_tag "modal" %>
+```
+
+---
+
+## 🔹 `app/views/stock_transfers/_stock_transfer.html.erb`
+
+```erb
+<tr id="<%= dom_id(stock_transfer) %>">
+  <td><%= stock_transfer.source_type %> - <%= stock_transfer.source.name %></td>
+  <td><%= stock_transfer.destination_type %> - <%= stock_transfer.destination.name %></td>
+  <td><%= l(stock_transfer.created_at, format: :short) %></td>
+  <td>
+    <%= link_to "Ver", stock_transfer_path(stock_transfer), class: "btn btn-sm btn-outline-secondary" %>
+    <%= link_to "Editar", edit_stock_transfer_path(stock_transfer), data: { turbo_frame: "modal" }, class: "btn btn-sm btn-outline-primary" %>
+    <%= link_to "Eliminar", stock_transfer_path(stock_transfer), data: { turbo_method: :delete, turbo_confirm: "¿Seguro?" }, class: "btn btn-sm btn-danger" %>
+  </td>
+</tr>
+```
+
+---
+
+## 🔹 `app/views/stock_transfers/_form.html.erb`
+
+```erb
+<%= form_with(model: stock_transfer, data: { turbo_frame: "_top" }, class: "needs-validation") do |f| %>
+  <div class="mb-3">
+    <%= f.label :source_type, "Tipo de origen" %>
+    <%= f.select :source_type, [["Warehouse", "Warehouse"], ["Store", "Store"]],
+          {}, class: "form-select", data: { action: "change->transfer#updateSource" } %>
+  </div>
+
+  <div class="mb-3" data-transfer-target="sourceSelect">
+    <%= f.label :source_id, "Origen" %>
+    <%= f.collection_select :source_id, Warehouse.all, :id, :name, {}, class: "form-select" %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :destination_type, "Tipo de destino" %>
+    <%= f.select :destination_type, [["Warehouse", "Warehouse"], ["Store", "Store"]],
+          {}, class: "form-select", data: { action: "change->transfer#updateDestination" } %>
+  </div>
+
+  <div class="mb-3" data-transfer-target="destinationSelect">
+    <%= f.label :destination_id, "Destino" %>
+    <%= f.collection_select :destination_id, Store.all, :id, :name, {}, class: "form-select" %>
+  </div>
+
+  <hr>
+
+  <h5>Productos a transferir</h5>
+  <div id="items">
+    <%= f.fields_for :stock_transfer_items do |item_form| %>
+      <%= render "item_fields", f: item_form %>
+    <% end %>
+  </div>
+  <%= link_to "Agregar producto", "#", class: "btn btn-outline-secondary", data: { action: "click->transfer#addItem" } %>
+
+  <div class="mt-4 text-end">
+    <%= f.submit class: "btn btn-success" %>
+  </div>
+<% end %>
+```
+
+---
+
+## 🔹 `app/views/stock_transfers/_item_fields.html.erb`
+
+```erb
+<div class="card mb-2 p-3 border">
+  <div class="row">
+    <div class="col-md-6">
+      <%= f.label :product_id, "Producto" %>
+      <%= f.collection_select :product_id, Product.all, :id, :name, {}, class: "form-select" %>
+    </div>
+    <div class="col-md-4">
+      <%= f.label :quantity, "Cantidad" %>
+      <%= f.number_field :quantity, class: "form-control", min: 1 %>
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+      <%= link_to "🗑️", "#", class: "btn btn-outline-danger", data: { action: "click->transfer#removeItem" } %>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+## 🔹 `app/views/stock_transfers/new.html.erb`
+
+```erb
+<%= turbo_frame_tag "modal" do %>
+  <div class="modal fade show d-block" tabindex="-1" style="background-color:rgba(0,0,0,.4)">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Nueva Transferencia</h5>
+          <button type="button" class="btn-close" data-action="click->modal#close"></button>
+        </div>
+        <div class="modal-body">
+          <%= render "form", stock_transfer: @stock_transfer %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+```
+
+---
+
+## 🔹 `app/views/stock_movements/index.html.erb`
+
+```erb
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Movimientos de Stock</h2>
+  <%= link_to "Nuevo movimiento", new_stock_movement_path, data: { turbo_frame: "modal" }, class: "btn btn-primary" %>
+</div>
+
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Ubicación</th>
+      <th>Producto</th>
+      <th>Tipo</th>
+      <th>Cantidad</th>
+      <th>Fecha</th>
+    </tr>
+  </thead>
+  <tbody>
+    <%= render @stock_movements %>
+  </tbody>
+</table>
+
+<%= turbo_frame_tag "modal" %>
+```
+
+---
+
+## 🔹 `app/views/stock_movements/_stock_movement.html.erb`
+
+```erb
+<tr id="<%= dom_id(stock_movement) %>">
+  <td><%= stock_movement.location.name %></td>
+  <td><%= stock_movement.product.name %></td>
+  <td><%= stock_movement.movement_type %></td>
+  <td><%= stock_movement.quantity %></td>
+  <td><%= l(stock_movement.created_at, format: :short) %></td>
+</tr>
+```
+
+---
+
+## 🔹 `app/views/stock_movements/_form.html.erb`
+
+```erb
+<%= form_with(model: stock_movement, data: { turbo_frame: "_top" }) do |f| %>
+  <div class="mb-3">
+    <%= f.label :movement_type, "Tipo de movimiento" %>
+    <%= f.select :movement_type, StockMovement.movement_types.keys.map { |t| [t.titleize, t] }, {}, class: "form-select" %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :location_type, "Tipo de ubicación" %>
+    <%= f.select :location_type, [["Warehouse", "Warehouse"], ["Store", "Store"]], {}, class: "form-select", data: { action: "change->movement#updateLocation" } %>
+  </div>
+
+  <div class="mb-3" data-movement-target="locationSelect">
+    <%= f.label :location_id, "Ubicación" %>
+    <%= f.collection_select :location_id, Warehouse.all, :id, :name, {}, class: "form-select" %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :product_id, "Producto" %>
+    <%= f.collection_select :product_id, Product.all, :id, :name, {}, class: "form-select" %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :quantity, "Cantidad" %>
+    <%= f.number_field :quantity, class: "form-control", min: 1 %>
+  </div>
+
+  <div class="text-end">
+    <%= f.submit class: "btn btn-success" %>
+  </div>
+<% end %>
+```
+
+---
+
+## 🔹 `app/views/reports/index.html.erb`
+
+```erb
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Reportes de Inventario</h2>
+  <%= form_with url: reports_path, method: :get, class: "d-flex gap-2" do %>
+    <%= select_tag :product_id, options_from_collection_for_select(Product.all, :id, :name, params[:product_id]), prompt: "Seleccione un producto", class: "form-select" %>
+    <%= submit_tag "Ver", class: "btn btn-outline-primary" %>
+  <% end %>
+</div>
+
+<% if @product.present? %>
+  <div class="card p-3 mb-3">
+    <h4><%= @product.name %></h4>
+    <p>Costo promedio: <strong><%= number_to_currency(@avg_cost) %></strong></p>
+    <p>Rotación: <strong><%= @rotation.round(2) %></strong></p>
+  </div>
+
+  <h5>Histórico de movimientos</h5>
+  <table class="table table-sm table-striped">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Tipo</th>
+        <th>Cantidad</th>
+        <th>Ubicación</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @movements.each do |m| %>
+        <tr>
+          <td><%= l(m.created_at, format: :short) %></td>
+          <td><%= m.movement_type %></td>
+          <td><%= m.quantity %></td>
+          <td><%= m.location.name %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+```
+
+---
+
+¿Querés que te prepare también los **controllers** con Turbo Streams (para crear, editar y eliminar sin recargar la página) de estos tres módulos?  
+Así te queda el stack completo listo para correr en Rails 8.
+
+Excelente, Pazzo 😎  
+vamos a cerrar el ciclo **completo del módulo de inventario avanzado** para tu sistema Rails 8:  
+vas a tener los **modelos, controladores, vistas, rutas y broadcasts Turbo** listos para correr.
+
+Esto incluye:  
+✅ `StockTransfer` y `StockTransferItem`  
+✅ `StockMovement`  
+✅ `ReportsController` (solo lectura)  
+✅ Rutas completas  
+✅ Turbo Streams + broadcasts  
+✅ Callbacks seguros  
+✅ Controllers 100% compatibles con Turbo Frames
+
+---
+
+## 🧭 RUTAS (`config/routes.rb`)
+
+```ruby
+Rails.application.routes.draw do
+  resources :warehouses
+  resources :stores
+  resources :products
+  resources :product_items
+
+  resources :stock_transfers do
+    resources :stock_transfer_items, only: [:create, :destroy]
+  end
+
+  resources :stock_movements
+
+  get "reports", to: "reports#index", as: :reports
+
+  root "products#index"
+end
+```
+
+---
+
+## 🚛 MODELOS
+
+### `app/models/stock_transfer.rb`
+
+```ruby
+class StockTransfer < ApplicationRecord
+  belongs_to :source, polymorphic: true
+  belongs_to :destination, polymorphic: true
+
+  has_many :stock_transfer_items, dependent: :destroy
+  accepts_nested_attributes_for :stock_transfer_items, allow_destroy: true
+
+  validates :source, :destination, presence: true
+  validate :different_locations
+
+  after_commit :process_transfer, on: :create
+  after_commit -> { broadcast_append_to "stock_transfers" }
+  after_update_commit -> { broadcast_replace_to "stock_transfers" }
+  after_destroy_commit -> { broadcast_remove_to "stock_transfers" }
+
+  private
+
+  def different_locations
+    errors.add(:destination, "no puede ser igual al origen") if source == destination
+  end
+
+  def process_transfer
+    stock_transfer_items.each do |item|
+      ProductItem.transaction do
+        source_item = ProductItem.find_by(product: item.product, location: source)
+        dest_item = ProductItem.find_or_create_by(product: item.product, location: destination)
+
+        source_item&.decrement!(:quantity, item.quantity)
+        dest_item.increment!(:quantity, item.quantity)
+      end
+    end
+  end
+end
+```
+
+---
+
+### `app/models/stock_transfer_item.rb`
+
+```ruby
+class StockTransferItem < ApplicationRecord
+  belongs_to :stock_transfer
+  belongs_to :product
+
+  validates :quantity, numericality: { greater_than: 0 }
+end
+```
+
+---
+
+### `app/models/stock_movement.rb`
+
+```ruby
+class StockMovement < ApplicationRecord
+  belongs_to :location, polymorphic: true
+  belongs_to :product
+
+  enum movement_type: { in: 0, out: 1 }
+
+  validates :quantity, numericality: { greater_than: 0 }
+
+  after_commit :apply_movement, on: :create
+  after_commit -> { broadcast_append_to "stock_movements" }
+  after_destroy_commit -> { broadcast_remove_to "stock_movements" }
+
+  private
+
+  def apply_movement
+    item = ProductItem.find_or_create_by(product: product, location: location)
+    if in?
+      item.increment!(:quantity, quantity)
+    else
+      item.decrement!(:quantity, quantity)
+    end
+  end
+end
+```
+
+---
+
+## 🧠 CONTROLADORES
+
+---
+
+### `app/controllers/stock_transfers_controller.rb`
+
+```ruby
+class StockTransfersController < ApplicationController
+  before_action :set_stock_transfer, only: %i[show edit update destroy]
+
+  def index
+    @stock_transfers = StockTransfer.includes(:source, :destination).order(created_at: :desc)
+  end
+
+  def show; end
+
+  def new
+    @stock_transfer = StockTransfer.new
+    @stock_transfer.stock_transfer_items.build
+  end
+
+  def edit; end
+
+  def create
+    @stock_transfer = StockTransfer.new(stock_transfer_params)
+    if @stock_transfer.save
+      respond_to do |format|
+        format.turbo_stream
+        format.html { redirect_to @stock_transfer, notice: "Transferencia creada." }
+      end
+    else
+      render :new, status: :unprocessable_entity
+    end
+  end
+
+  def update
+    if @stock_transfer.update(stock_transfer_params)
+      respond_to do |format|
+        format.turbo_stream
+        format.html { redirect_to @stock_transfer, notice: "Transferencia actualizada." }
+      end
+    else
+      render :edit, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    @stock_transfer.destroy
+    respond_to do |format|
+      format.turbo_stream
+      format.html { redirect_to stock_transfers_path, notice: "Transferencia eliminada." }
+    end
+  end
+
+  private
+
+  def set_stock_transfer
+    @stock_transfer = StockTransfer.find(params[:id])
+  end
+
+  def stock_transfer_params
+    params.require(:stock_transfer).permit(
+      :source_type, :source_id, :destination_type, :destination_id,
+      stock_transfer_items_attributes: [:id, :product_id, :quantity, :_destroy]
+    )
+  end
+end
+```
+
+---
+
+### `app/controllers/stock_transfer_items_controller.rb`
+
+```ruby
+class StockTransferItemsController < ApplicationController
+  before_action :set_stock_transfer
+
+  def create
+    @item = @stock_transfer.stock_transfer_items.create(stock_transfer_item_params)
+    respond_to do |format|
+      format.turbo_stream
+    end
+  end
+
+  def destroy
+    @item = @stock_transfer.stock_transfer_items.find(params[:id])
+    @item.destroy
+    respond_to do |format|
+      format.turbo_stream
+    end
+  end
+
+  private
+
+  def set_stock_transfer
+    @stock_transfer = StockTransfer.find(params[:stock_transfer_id])
+  end
+
+  def stock_transfer_item_params
+    params.require(:stock_transfer_item).permit(:product_id, :quantity)
+  end
+end
+```
+
+---
+
+### `app/controllers/stock_movements_controller.rb`
+
+```ruby
+class StockMovementsController < ApplicationController
+  before_action :set_stock_movement, only: %i[show edit update destroy]
+
+  def index
+    @stock_movements = StockMovement.includes(:product, :location).order(created_at: :desc)
+  end
+
+  def show; end
+
+  def new
+    @stock_movement = StockMovement.new
+  end
+
+  def edit; end
+
+  def create
+    @stock_movement = StockMovement.new(stock_movement_params)
+    if @stock_movement.save
+      respond_to do |format|
+        format.turbo_stream
+        format.html { redirect_to stock_movements_path, notice: "Movimiento registrado." }
+      end
+    else
+      render :new, status: :unprocessable_entity
+    end
+  end
+
+  def update
+    if @stock_movement.update(stock_movement_params)
+      respond_to do |format|
+        format.turbo_stream
+        format.html { redirect_to stock_movements_path, notice: "Movimiento actualizado." }
+      end
+    else
+      render :edit, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    @stock_movement.destroy
+    respond_to do |format|
+      format.turbo_stream
+      format.html { redirect_to stock_movements_path, notice: "Movimiento eliminado." }
+    end
+  end
+
+  private
+
+  def set_stock_movement
+    @stock_movement = StockMovement.find(params[:id])
+  end
+
+  def stock_movement_params
+    params.require(:stock_movement).permit(:product_id, :quantity, :movement_type, :location_type, :location_id)
+  end
+end
+```
+
+---
+
+### `app/controllers/reports_controller.rb`
+
+```ruby
+class ReportsController < ApplicationController
+  def index
+    if params[:product_id].present?
+      @product = Product.find(params[:product_id])
+      @movements = StockMovement.where(product: @product).includes(:location).order(created_at: :desc)
+      @avg_cost = StockReport.average_cost(@product)
+      @rotation = StockReport.rotation_rate(@product)
+    else
+      @movements = []
+    end
+  end
+end
+```
+
+---
+
+## 🪄 MIGRACIONES
+
+```ruby
+class CreateStockTransfers < ActiveRecord::Migration[7.1]
+  def change
+    create_table :stock_transfers do |t|
+      t.references :source, polymorphic: true, null: false
+      t.references :destination, polymorphic: true, null: false
+      t.timestamps
+    end
+  end
+end
+```
+
+```ruby
+class CreateStockTransferItems < ActiveRecord::Migration[7.1]
+  def change
+    create_table :stock_transfer_items do |t|
+      t.references :stock_transfer, null: false, foreign_key: true
+      t.references :product, null: false, foreign_key: true
+      t.integer :quantity, null: false, default: 0
+      t.timestamps
+    end
+  end
+end
+```
+
+```ruby
+class CreateStockMovements < ActiveRecord::Migration[7.1]
+  def change
+    create_table :stock_movements do |t|
+      t.references :location, polymorphic: true, null: false
+      t.references :product, null: false, foreign_key: true
+      t.integer :movement_type, default: 0, null: false
+      t.integer :quantity, null: false
+      t.timestamps
+    end
+  end
+end
+```
+
+---
+
+## 💥 Opcional: Stimulus controllers
+
+`app/javascript/controllers/transfer_controller.js`
+
+```js
+import { Controller } from "@hotwired/stimulus"
+
+export default class extends Controller {
+  static targets = ["sourceSelect", "destinationSelect"]
+
+  updateSource(event) {
+    const type = event.target.value
+    this.loadOptions(this.sourceSelectTarget, type)
+  }
+
+  updateDestination(event) {
+    const type = event.target.value
+    this.loadOptions(this.destinationSelectTarget, type)
+  }
+
+  loadOptions(target, type) {
+    fetch(`/locations/options?type=${type}`, { headers: { Accept: "text/vnd.turbo-stream.html" } })
+      .then(r => r.text())
+      .then(html => target.innerHTML = html)
+  }
+
+  addItem(e) {
+    e.preventDefault()
+    const template = document.querySelector("#item_template").content.cloneNode(true)
+    document.querySelector("#items").appendChild(template)
+  }
+
+  removeItem(e) {
+    e.preventDefault()
+    e.target.closest(".card").remove()
+  }
+}
+```
+
+---
+
+## ⚙️ ¿Qué sigue?
+
+Si querés, puedo generarte ahora el **`.excalidraw` actualizado** con los modelos:  
+`Warehouse`, `Store`, `Product`, `ProductItem`, `StockTransfer`, `StockTransferItem`, `StockMovement` y `StockReport`  
+— todas las relaciones dibujadas para que lo abras directo en tu Obsidian.
+
+¿Quieres que te lo prepare ya?
+
+
