@@ -13,29 +13,42 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "VirtualStorage/Comienzos.md",
+                "file": "VirtualStorage/Sistema Almacén Virtual.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Comienzos"
+              "title": "Sistema Almacén Virtual"
             }
           },
           {
-            "id": "499c8fe2bab94f0c",
+            "id": "75591b5573b3bda5",
+            "type": "leaf",
+            "state": {
+              "type": "image",
+              "state": {
+                "file": "VirtualStorage/virtual_storage.jpg"
+              },
+              "icon": "lucide-image",
+              "title": "virtual_storage"
+            }
+          },
+          {
+            "id": "9d467b1e9323ab90",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "VirtualStorage/warehouse_erd.excalidraw.md",
+                "file": "VirtualStorage/Notas de todo.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "warehouse_erd.excalidraw"
+              "title": "Notas de todo"
             }
           }
-        ]
+        ],
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -184,29 +197,29 @@
       "obsidian-excalidraw-plugin:Nuevo Bosquejo": false
     }
   },
-  "active": "69a045d2643df7e0",
+  "active": "9d467b1e9323ab90",
   "lastOpenFiles": [
     "VirtualStorage/Sistema Almacén Virtual.md",
-    "VirtualStorage/existente/images.png",
-    "VirtualStorage/existente/Sin confirmar 60196.crdownload",
+    "VirtualStorage/virtual_storage.jpg",
+    "VirtualStorage/warehouse_erd.excalidraw.md",
+    "VirtualStorage/existente/4.jpeg",
+    "VirtualStorage/existente/5.jpeg",
+    "VirtualStorage/existente/3.jpeg",
     "VirtualStorage/existente/2.jpeg",
     "VirtualStorage/existente/1.jpeg",
-    "VirtualStorage/existente/5.jpeg",
-    "VirtualStorage/existente/4.jpeg",
-    "VirtualStorage/existente/3.jpeg",
+    "VirtualStorage/Notas de todo.md",
+    "VirtualStorage/existente/images.png",
+    "VirtualStorage/existente/Sin confirmar 60196.crdownload",
     "VirtualStorage/existente/1acdee7d-4c32-410b-8862-e85af7b33525.jpeg",
     "VirtualStorage/existente/Sin confirmar 198774.crdownload",
     "VirtualStorage/existente/6880d3ba-06c6-4dcf-9200-1aa7b9ec9fa2.jpeg",
     "VirtualStorage/existente/Sin confirmar 96917.crdownload",
     "VirtualStorage/existente/5eb6d2de-fd9e-42eb-a2f9-aa3e4e362579.jpeg",
     "VirtualStorage/existente/Sin confirmar 782636.crdownload",
-    "VirtualStorage/existente/6a413efd-eaa2-4e6b-9154-fcabc6c972a3.jpeg",
     "VirtualStorage/existente/Sin confirmar 71891.crdownload",
     "VirtualStorage/existente/Sin confirmar 595831.crdownload",
     "VirtualStorage/existente/Sin confirmar 741602.crdownload",
     "VirtualStorage/existente",
-    "VirtualStorage/Comienzos.md",
-    "VirtualStorage/warehouse_erd.excalidraw.md",
     "VirtualStorage/VirtualStorage.vpp",
     "VirtualStorage/modelado.excalidraw.md",
     "VirtualStorage/Drawing 2025-10-08 18.25.59.excalidraw.md",
